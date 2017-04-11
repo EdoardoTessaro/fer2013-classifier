@@ -1,14 +1,9 @@
 import tensorflow as tf
 from pandas import read_csv
+from multiprocessing import Pool
 
 def string_to_list(s):
   return list(map(float, s.split(" ")))
-
-def file_size(filename):
-  with open(filename) as f:
-    for i, l in enumerate(f):
-      pass
-  return i+1
 
 def one_hot(array, depth):
   def one_hot_helper(value):
@@ -16,6 +11,21 @@ def one_hot(array, depth):
     l[value] = 1
     return l
   return list(map(one_hot_helper, array))
+
+def extract_data(array, start, end):
+  return list(map(string_to_list, array[start:end]))
+
+def extract_labels(array, start, end):
+  return one_hot(list(map(int, array[start:end])), 7)
+
+def file_size(filename):
+  with open(filename) as f:
+    for i, l in enumerate(f):
+      pass
+  return i+1
+
+def get_list_from_raw_data(raw_data, index):
+  return raw_data.ix[:,index].values.tolist()
 
 class FER2013Reader(object):
   def __init__(self, start=0, size=None, verbose=True):
@@ -39,12 +49,13 @@ class FER2013Reader(object):
     for train_size in range(len(usage)):
       if usage[train_size] != 'Training':
         break
-    data = raw_data.ix[:,1].values.tolist()
-    labels = raw_data.ix[:,0].values.tolist()
-    self.train = list(map(string_to_list, data[:train_size]))
-    self.train_label = one_hot(list(map(int, labels[:train_size])), 7)
-    self.test = list(map(string_to_list, data[train_size:]))
-    self.test_label = one_hot(list(map(int, labels[train_size:])), 7)
+    self.train_size = train_size
+    data = get_list_from_raw_data(raw_data, 1)
+    labels = get_list_from_raw_data(raw_data, 0)
+    self.train = extract_data(data, None, train_size)
+    self.train_label = extract_labels(labels, None, train_size)
+    self.test = extract_data(data, train_size, None)
+    self.test_label = extract_labels(labels, train_size, None)
     
     self.batch_index=0
     
@@ -54,7 +65,7 @@ class FER2013Reader(object):
   def get_batch(self, batch_size):
     a = self.batch_index
     self.batch_index += batch_size
-    self.batch_index = self.batch_index % self.size
+    self.batch_index = self.batch_index % self.train_size
     b = self.batch_index
     
     if a < b:
