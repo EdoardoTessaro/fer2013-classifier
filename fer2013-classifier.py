@@ -1,7 +1,8 @@
 import tensorflow as tf
-from read_dataset import get_dataset
+from read_dataset import FER2013Reader
 import os.path
-import time
+from time import time
+from datetime import datetime
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -62,13 +63,9 @@ def main():
   W_fc2 = weight_variable([1024, 7])
   b_fc2 = bias_variable([7])
   
-  
-  print("> Loading fer2013 dataset...")
-  train, train_label, test, test_label = get_dataset()
+  dataset = FER2013Reader()
   
   print("> Setting up convolutional graph...")
-  train_label = tf.one_hot(train_label, 7)
-  test_label = tf.one_hot(test_label, 7)
   y_conv = activate(x_image, W_conv1,  W_conv2, W_conv3, W_fc1, W_fc2,
                     b_conv1, b_conv2, b_conv3, b_fc1, b_fc2, keep_prob)
   
@@ -77,30 +74,41 @@ def main():
   correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
   
-  batch_size = 50
-  train_size = len(train)
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    y_train = train_label.eval()
-    y_test = test_label.eval()
-    batch_x = []
-    batch_y = []
-    current_time = time.time()
-    print_interval = 25
-    cycle_dataset = 20
-    print("> Training...")
-    for j in range(cycle_dataset):
-      for i in range(train_size // batch_size):
-        batch_x = train[i*batch_size:min((i+1)*batch_size, train_size)]
-        batch_y = y_train[i*batch_size:min((i+1)*batch_size, train_size)]
-        if i % print_interval == 0:
-          
-          train_accuracy = accuracy.eval(feed_dict={x_image:batch_x, y_:batch_y, keep_prob:1.0})
-          print("> step %d/%d -> Training accuracy: %g"%(i + j*(train_size // batch_size), (cycle_dataset*train_size // batch_size)-1, train_accuracy))
-        train_step.run(feed_dict={x_image:batch_x, y_:batch_y, keep_prob:1.0})
     
-    print("> Training done. Testing accuracy...")
-    final_accuracy = accuracy.eval(feed_dict={x_image:test, y_:y_test, keep_prob: 1.0})
+    train, train_label = dataset.Train
+    test, test_label = dataset.Test
+    
+    start_training_time = datetime.today()
+    
+    print("> Starting training at {:%Y-%m-%d %H:%M:%S}".format(start_training_time))
+    steps = 20000
+    batch_size = 50
+    print_interval = 25
+    last_time = 0
+    for step in range(steps):
+      batch = dataset.get_batch(batch_size)
+      if step % print_interval == 0:
+        if step == 0:
+          last_time = time()
+        else:
+          train_accuracy = accuracy.eval(feed_dict={x_image:   batch[0],
+                                                    y_:        batch[1],
+                                                    keep_prob: 1.0      })
+          current_time = time()
+          eta = int((current_time - last_time) * (steps - step)/print_interval)
+          print("> step {:5}/{:5} -> Training accuracy: {:02.0f}% -> ETA: {}h {:02.0f}m {:02.0f}s ({} images/sec)".format(
+                step, steps, train_accuracy*100, eta//3600, (eta//60)%60, eta%60, int(batch_size * print_interval / (current_time - last_time))))
+          last_time = current_time
+      train_step.run(feed_dict={x_image:   batch[0],
+                                y_:        batch[1],
+                                keep_prob: 1.0      })
+    end_training_time = datetime.today()
+    print("> Training done. Start: {:%Y-%m-%d %H:%M:%S}, end: {:%Y-%m-%d %H:%M:%S} Testing accuracy...".format(start_training_time, end_training_time))
+    final_accuracy = accuracy.eval(feed_dict={x_image:test,
+                                              y_:y_test,
+                                              keep_prob: 1.0 })
     print("> Final accuracy: %g"%final_accuracy)
   
 
