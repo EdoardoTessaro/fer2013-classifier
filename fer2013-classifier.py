@@ -1,5 +1,5 @@
 import tensorflow as tf
-from read_dataset import get_dataset
+from read_dataset import FER2013Reader
 import os.path
 import time
 
@@ -62,13 +62,9 @@ def main():
   W_fc2 = weight_variable([1024, 7])
   b_fc2 = bias_variable([7])
   
-  
-  print("> Loading fer2013 dataset...")
-  train, train_label, test, test_label = get_dataset()
+  dataset = FER2013Reader()
   
   print("> Setting up convolutional graph...")
-  train_label = tf.one_hot(train_label, 7)
-  test_label = tf.one_hot(test_label, 7)
   y_conv = activate(x_image, W_conv1,  W_conv2, W_conv3, W_fc1, W_fc2,
                     b_conv1, b_conv2, b_conv3, b_fc1, b_fc2, keep_prob)
   
@@ -77,22 +73,21 @@ def main():
   correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
   
-  batch_size = 50
-  train_size = len(train)
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    y_train = train_label.eval()
-    y_test = test_label.eval()
-    batch_x = []
-    batch_y = []
+    
+    train, train_label = dataset.Train
+    test, test_label = dataset.Test
+    
     current_time = time.time()
+    train_size = len(test)
     print_interval = 25
     cycle_dataset = 20
+    batch_size = 50
     print("> Training...")
     for j in range(cycle_dataset):
       for i in range(train_size // batch_size):
-        batch_x = train[i*batch_size:min((i+1)*batch_size, train_size)]
-        batch_y = y_train[i*batch_size:min((i+1)*batch_size, train_size)]
+        batch_x, batch_y = dataset.get_batch(batch_size)
         if i % print_interval == 0:
           
           train_accuracy = accuracy.eval(feed_dict={x_image:batch_x, y_:batch_y, keep_prob:1.0})
