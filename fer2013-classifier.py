@@ -2,7 +2,7 @@ import tensorflow as tf
 from read_dataset import FER2013Reader
 import os.path
 from time import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -98,18 +98,24 @@ def main():
                                                     keep_prob: 1.0      })
           current_time = time()
           eta = int((current_time - last_time) * (steps - step)/print_interval)
-          print("> step {:5}/{:5} -> Training accuracy: {:02.0f}% -> ETA: {}h {:02.0f}m {:02.0f}s ({} images/sec)".format(
+          print("> step {:5}/{} -> Training accuracy: {:02.0f}% -> ETA: {}h {:02.0f}m {:02.0f}s ({} images/sec)".format(
                 step, steps, train_accuracy*100, eta//3600, (eta//60)%60, eta%60, int(batch_size * print_interval / (current_time - last_time))))
           last_time = current_time
       train_step.run(feed_dict={x_image:   batch[0],
                                 y_:        batch[1],
                                 keep_prob: 1.0      })
     end_training_time = datetime.today()
-    print("> Training done. Start: {:%Y-%m-%d %H:%M:%S}, end: {:%Y-%m-%d %H:%M:%S} Testing accuracy...".format(start_training_time, end_training_time))
+    delta = end_training_time - start_training_time
+    delta = delta - timedelta(microseconds=delta.microseconds)
+    print("> Training done.")
+    print("> Start time: {:%Y-%m-%d %H:%M:%S}".format(start_training_time))
+    print("> End time:   {:%Y-%m-%d %H:%M:%S}".format(end_training_time))
+    print("> Duration:   {}".format(delta))
+    print("> Testing accuracy...")
     final_accuracy = accuracy.eval(feed_dict={x_image:test,
-                                              y_:y_test,
+                                              y_:test_label,
                                               keep_prob: 1.0 })
-    print("> Final accuracy: %g"%final_accuracy)
+    print("> Final accuracy: {:04.2f}%".format(final_accuracy*100))
   
 
 if __name__ == '__main__':
